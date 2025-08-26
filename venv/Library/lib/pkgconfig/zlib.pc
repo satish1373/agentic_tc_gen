@@ -1,0 +1,13 @@
+prefix=D:/Projects/real_usecases/Agentic_QA/venv/Library
+exec_prefix=D:/Projects/real_usecases/Agentic_QA/venv/Library
+libdir=D:/Projects/real_usecases/Agentic_QA/venv/Library/lib
+sharedlibdir=D:/Projects/real_usecases/Agentic_QA/venv/Library/lib
+includedir=D:/Projects/real_usecases/Agentic_QA/venv/Library/include
+
+Name: zlib
+Description: zlib compression library
+Version: 1.2.13
+
+Requires:
+Libs: -L${libdir} -L${sharedlibdir} -lz
+Cflags: -I${includedir}

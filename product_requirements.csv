@@ -1,0 +1,87 @@
+﻿requirements
+Product requirements document: currency converter
+1. Introduction
+"This document outlines the requirements for developing a currency converter application. The app aims to provide users with a user-friendly and accurate tool for converting between various currencies, leveraging real-time exchange rates. This application will be beneficial for travelers, online shoppers, businesses, and anyone needing quick and reliable currency conversion information."
+2. Product vision and goals
+2.1. Product vision
+"The goal is to create a user-friendly and reliable currency converter application. This application will empower users with access to global exchange rates, supporting informed financial decisions."
+2.2. Goals
+Real-time accuracy: Provide up-to-the-minute currency exchange rates for many global currencies.
+Intuitive user experience: Design a simple and easy-to-use interface for easy conversion and navigation.
+"Comprehensive currency support: Offer conversion capabilities for many currencies, including major world currencies and cryptocurrencies."
+"Monetization potential: Explore revenue streams, such as in-app advertisements, premium features, and affiliate partnerships."
+2.3. Key performance indicators (KPIs)
+"User engagement: Track daily/monthly active users, average session duration, and feature usage."
+Accuracy: Monitor the precision of exchange rates against external sources.
+Conversion rates: Analyze the success rate of conversion operations within the app.
+Monetization revenue: Track revenue generated from various monetization channels.
+3. Scope of work
+3.1. In scope
+Currency conversion between supported currencies.
+Real-time exchange rate updates.
+Display of currency trends and historical exchange rate charts.
+In-app calculator for basic arithmetic operations on converted amounts.
+Search and filter functionality for currencies.
+Offline access to the last-updated exchange rates.
+Basic UI/UX design and development.
+Essential functionalities for a mobile-first approach (iOS and Android).
+3.2. Out of scope
+Advanced financial analysis tools or trading capabilities.
+Integration with specific banking or payment platforms.
+Multi-language support for the application's interface initially.
+Complex features like augmented reality (AR) or voice search.
+4. User stories
+"As a traveler, it is desirable to quickly convert local prices into home currency so that budgeting is easy and overspending can be avoided."
+"As an online shopper, seeing product prices in a preferred currency is desirable to compare deals and make informed purchasing decisions."
+"As a business owner, monitoring real-time exchange rates of various currencies is desirable to make timely and strategic business decisions."
+"As a user, it is desirable to view historical exchange rate data for a currency pair to understand trends and analyze past performance."
+"As a user, it is desirable to convert an amount from one currency to multiple other currencies simultaneously to reduce manual effort."
+5. Functional requirements
+"Currency selection: Allow users to easily select the source and target currencies for conversion, preferably using ISO 4217 currency codes."
+Amount input: Provide a clear input field for users to enter the amount they wish to convert.
+Conversion calculation: Implement an algorithm for accurate currency conversion based on the selected currencies and the entered amount.
+Real-time exchange rates: Integrate with a reliable currency converter API to fetch real-time exchange rates.
+Historical exchange rates: Provide the ability to access and view historical exchange rates for selected currency pairs.
+Multi-currency conversion: Enable users to convert a single amount into multiple currencies at once.
+"Calculator functionality: Include basic arithmetic operations (addition, subtraction, multiplication, division) within the app to perform calculations on converted amounts."
+Offline mode: Store the last available exchange rates for offline access and display a notification when rates are not updated.
+Search and filter: Implement search and filtering options for users to quickly find specific currencies.
+Swap currencies: Provide a quick option to swap the source and target currencies.
+Save conversion history: Allow users to save their past conversion operations for easy reference.
+6. Non-functional requirements
+6.1. Performance
+Fast loading times: The app should load quickly and efficiently to provide a seamless user experience.
+Real-time updates: Exchange rates should update quickly and automatically to reflect current market conditions.
+Responsiveness: The app should be highly responsive to user interactions and actions.
+6.2. Reliability
+Accurate exchange rates: The system must provide highly accurate exchange rate data to prevent erroneous calculations.
+Error handling: The application should handle invalid inputs and unexpected events gracefully.
+"Data integrity: Ensure the accuracy and reliability of the currency data, potentially using aggregation from multiple sources."
+6.3. Security
+"Secure API integration: Utilize secure protocols (e.g., HTTPS) for accessing currency exchange rate APIs to protect data transmission."
+"User data privacy: Adhere to relevant data privacy regulations and policies, if any user data is collected or stored."
+6.4. Usability
+Intuitive interface: Design a user interface that is easy to navigate and understand for a wide range of users.
+Accessible design: Consider implementing features like dark mode to enhance user experience and accessibility.
+"Visual cues: Use clear visual cues and graphical representations (e.g., charts) to display exchange rate trends and information."
+6.5. Compatibility
+Cross-platform compatibility: Ensure the application functions seamlessly on both iOS and Android platforms.
+Browser compatibility (if web app): Ensure the web application is compatible with various web browsers.
+7. Assumptions and constraints
+Access to reliable API: An assumption is that there is access to a high-quality and reliable currency exchange rate API.
+Technical expertise: Availability of necessary technical expertise for development and API integration.
+Market conditions: Assume stable market conditions for currency exchange rates and the functionality of the integrated API.
+"Scope limitations: Constraints on the initial scope of the project, focusing on core functionalities and a phased approach to adding more features."
+8. Release criteria
+Core functionality met: All primary features outlined in this document are implemented and functional.
+"Testing completed: Comprehensive functional and non-functional testing is completed, and critical defects are resolved."
+"Performance benchmarks met: The app meets defined performance standards, including loading times and responsiveness."
+User acceptance testing (UAT) passed: The app is approved by a representative group of target users.
+9. Success metrics
+Achieve target number of downloads/installs.
+"Maintain a positive app store rating (e.g., 4.5 stars or higher)."
+Reach a specific monthly active user (MAU) target.
+Achieve a target user retention rate.
+Generate desired revenue from monetization channels.
+10. Stakeholder review
+"This document will be reviewed by all key stakeholders, including product management, development team, design team, and quality assurance, to ensure alignment on the product's vision, goals, and requirements. This iterative review process will address any questions, feedback, or potential adjustments to the project scope and timeline. Regular updates and communication will ensure everyone is informed about the progress and any changes throughout the development lifecycle."

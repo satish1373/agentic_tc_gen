@@ -1,0 +1,11 @@
+langchain
+langgraph
+openai # for OpenAI Models
+anthropic # for claude models 
+google-generativeai #for gemini models
+langchain_openai # for OpenAI LLMs
+langchain_core # for core langchain functionality
+langchain_community # for community tools and models
+python-dotenv # for loading environment variables
+openpyxl
+
