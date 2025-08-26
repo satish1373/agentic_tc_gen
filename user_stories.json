@@ -1,7 +1,0 @@
-[
-    {"user_story": "As a traveler, I want to quickly convert local prices into home currency so that budgeting is easy and overspending can be avoided."},
-    {"user_story": "As an online shopper, I want to see product prices in a preferred currency to compare deals and make informed purchasing decisions."},
-    {"user_story": "As a business owner, I want to monitor real-time exchange rates to make timely and strategic decisions."},
-    {"user_story": "As a user, I want to view historical exchange rate data to understand trends and analyze performance."},
-    {"user_story": "As a user, I want to convert an amount from one currency to multiple others to reduce manual effort."}
-]
