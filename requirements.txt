@@ -9,3 +9,9 @@ langchain_community # for community tools and models
 python-dotenv # for loading environment variables
 openpyxl
 
+jira
+langchain-core
+langchain-openai
+openai
+python-dotenv
+requests
