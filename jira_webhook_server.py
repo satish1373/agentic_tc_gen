@@ -204,7 +204,11 @@ def test_webhook():
 
 if __name__ == '__main__':
     print("🚀 Starting Jira LangGraph Webhook Server...")
-    print("🔗 Configure your Jira webhook to point to: https://your-repl-url.replit.dev/jira-webhook")
+    print("🔗 Configure your Jira webhook to point to: https://workspace.satish73learnin.replit.dev/jira-webhook")
     print("🤖 LangGraph AI-powered test case generation enabled")
     print("⚠️  Make sure OPENAI_API_KEY is set in Secrets for full AI capabilities")
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    
+    # Use production-ready settings
+    import os
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
