@@ -584,8 +584,8 @@ def handle_jira_webhook():
             print(f"✅ New Jira issue created: {issue_key} - {issue_summary} ({issue_type})")
             
             # Trigger code completion based on issue type
-            if issue_type in ['Bug', 'Task', 'Story']:
-                print(f"🚀 Triggering test generation for {issue_type}")
+            if issue_type in ['Bug', 'Task', 'Story', 'Feature', 'Epic', 'Improvement']:
+                print(f"🚀 Triggering AI-powered analysis for {issue_type}")
                 trigger_code_completion(issue_key, issue_summary, issue_type)
             else:
                 print(f"⏭️ Skipping issue type: {issue_type}")
