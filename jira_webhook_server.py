@@ -5,7 +5,39 @@ import json
 import os
 from dotenv import load_dotenv
 from jira import JIRA
-from jira_langgraph_generator import generate_test_cases_for_jira_issue
+from agentic_test_generator_1 import AgenticTestCaseGenerator
+
+# Initialize the enhanced generator
+enhanced_generator = AgenticTestCaseGenerator()
+
+def generate_test_cases_for_jira_issue(issue_key: str, summary: str, issue_type: str) -> str:
+    """Generate test cases for Jira issue using enhanced generator"""
+    try:
+        # Create a requirement from the Jira issue
+        requirements = [(issue_key, f"{summary} - Type: {issue_type}")]
+        
+        # Generate test cases
+        test_cases = enhanced_generator.generate_test_cases(requirements)
+        
+        # Export to JSON file
+        filename = f"jira_generated_test_cases_{issue_key}.json"
+        enhanced_generator.export_to_json(test_cases, filename)
+        
+        # Create summary for Jira comment
+        summary_text = f"Generated {len(test_cases)} test cases for {issue_key}:\n\n"
+        
+        for i, tc in enumerate(test_cases[:5]):  # Show first 5
+            summary_text += f"{i+1}. **{tc.title}** ({tc.test_type.value})\n"
+            summary_text += f"   - Priority: {tc.priority}\n"
+            summary_text += f"   - Expected: {tc.expected_result[:100]}...\n\n"
+        
+        if len(test_cases) > 5:
+            summary_text += f"... and {len(test_cases) - 5} more test cases in {filename}"
+        
+        return summary_text
+        
+    except Exception as e:
+        return f"Error generating test cases: {str(e)}"
 
 load_dotenv()
 
