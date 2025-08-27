@@ -1,25 +1,10 @@
-langchain
-langgraph
-openai # for OpenAI Models
-anthropic # for claude models 
-google-generativeai #for gemini models
-langchain_openai # for OpenAI LLMs
-langchain_core # for core langchain functionality
-langchain_community # for community tools and models
-python-dotenv # for loading environment variables
-openpyxl
-
-jira
-langchain-core
-langchain-openai
-openai
-python-dotenv
-requests
-flask
-jira
-python-dotenv
-requests
-flask
-jira
-python-dotenv
-requests
+Flask==2.3.3
+python-dotenv==1.0.0
+jira==3.5.0
+requests==2.31.0
+langchain==0.2.16
+langchain-core==0.2.38
+langchain-openai==0.1.23
+langgraph==0.2.16
+gradio==4.44.0
+pandas==2.0.3
