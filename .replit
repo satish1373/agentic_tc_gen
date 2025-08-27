@@ -19,3 +19,7 @@ args = "python jira_webhook_server.py"
 
 [deployment]
 run = ["sh", "-c", "python agentic_test_generator_1.py"]
+
+[[ports]]
+localPort = 5000
+externalPort = 80
