@@ -115,6 +115,29 @@ An attempt was made to generate automated test cases for this issue, but it was 
     except Exception as e:
         print(f"❌ Error updating Jira issue: {str(e)}")
 
+@app.route('/')
+def home():
+    """Home page with server information"""
+    return """
+    <html>
+    <head><title>Jira LangGraph Webhook Server</title></head>
+    <body>
+        <h1>🚀 Jira LangGraph Webhook Server</h1>
+        <p><strong>Status:</strong> Running</p>
+        <p><strong>Available Endpoints:</strong></p>
+        <ul>
+            <li><code>/jira-webhook</code> - POST endpoint for Jira webhooks</li>
+            <li><code>/health</code> - GET endpoint for health checks</li>
+        </ul>
+        <p><strong>Configuration:</strong></p>
+        <ul>
+            <li>🤖 LangGraph AI-powered test case generation enabled</li>
+            <li>🔗 Configure your Jira webhook to point to: <code>https://your-repl-url.replit.dev/jira-webhook</code></li>
+        </ul>
+    </body>
+    </html>
+    """
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
