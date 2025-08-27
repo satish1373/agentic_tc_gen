@@ -31,7 +31,17 @@ else:
 def handle_jira_webhook():
     """Handle incoming Jira webhook events"""
     try:
+        print("🔔 Received webhook request")
         payload = request.get_json()
+        
+        if not payload:
+            print("❌ No JSON payload received")
+            return jsonify({"status": "error", "message": "No JSON payload"}), 400
+        
+        print(f"📦 Webhook Event: {payload.get('webhookEvent', 'Unknown')}")
+        
+        # Log the full payload for debugging (remove in production)
+        print(f"🔍 Payload keys: {list(payload.keys())}")
         
         # Check if this is an issue creation event
         if payload.get('webhookEvent') == 'jira:issue_created':
@@ -40,24 +50,45 @@ def handle_jira_webhook():
             issue_summary = issue_data.get('fields', {}).get('summary')
             issue_type = issue_data.get('fields', {}).get('issuetype', {}).get('name')
             
-            print(f"New Jira issue created: {issue_key} - {issue_summary}")
+            print(f"✅ New Jira issue created: {issue_key} - {issue_summary} ({issue_type})")
             
             # Trigger code completion based on issue type
             if issue_type in ['Bug', 'Task', 'Story']:
+                print(f"🚀 Triggering test generation for {issue_type}")
                 trigger_code_completion(issue_key, issue_summary, issue_type)
+            else:
+                print(f"⏭️ Skipping issue type: {issue_type}")
             
-            return jsonify({"status": "success", "message": "Webhook processed"}), 200
+            return jsonify({
+                "status": "success", 
+                "message": f"Webhook processed for {issue_key}",
+                "issue_key": issue_key,
+                "issue_type": issue_type
+            }), 200
+        
+        # Handle other webhook events
+        elif payload.get('webhookEvent') == 'jira:issue_updated':
+            issue_data = payload.get('issue', {})
+            issue_key = issue_data.get('key')
+            print(f"📝 Jira issue updated: {issue_key} (not processing)")
             
-        return jsonify({"status": "ignored", "message": "Event not processed"}), 200
+        return jsonify({"status": "ignored", "message": f"Event {payload.get('webhookEvent')} not processed"}), 200
         
     except Exception as e:
-        print(f"Error processing webhook: {str(e)}")
-        return jsonify({"status": "error", "message": str(e)}), 500
+        error_msg = f"Error processing webhook: {str(e)}"
+        print(f"❌ {error_msg}")
+        return jsonify({"status": "error", "message": error_msg}), 500
 
 def trigger_code_completion(issue_key, summary, issue_type):
     """Trigger automated test case generation using LangGraph"""
     try:
         print(f"🚀 Triggering LangGraph test generation for {issue_key}")
+        print(f"📋 Issue: {summary}")
+        print(f"🏷️ Type: {issue_type}")
+        
+        # Check if OpenAI API key is available
+        if not os.getenv('OPENAI_API_KEY'):
+            print("⚠️ OPENAI_API_KEY not found - using fallback template generation")
         
         # Generate test cases using LangGraph
         filename = generate_test_cases_for_jira_issue(issue_key, summary, issue_type)
@@ -66,11 +97,20 @@ def trigger_code_completion(issue_key, summary, issue_type):
             print(f"✅ LangGraph test generation successful: {filename}")
             # Update Jira issue with generated artifacts
             update_jira_issue(issue_key, filename)
+            print(f"📄 Generated file: {filename}")
         else:
             print(f"❌ LangGraph test generation failed for {issue_key}")
+            # Try updating Jira anyway to show the attempt
+            update_jira_issue(issue_key, None)
             
     except Exception as e:
-        print(f"Error in LangGraph test generation: {str(e)}")
+        error_msg = f"Error in LangGraph test generation: {str(e)}"
+        print(f"❌ {error_msg}")
+        # Try to update Jira with error information
+        try:
+            update_jira_issue(issue_key, None)
+        except:
+            pass
 
 # Old test case generation functions removed - now using LangGraph AI generator
 
@@ -142,6 +182,25 @@ def home():
 def health_check():
     """Health check endpoint"""
     return jsonify({"status": "healthy"}), 200
+
+@app.route('/test-webhook', methods=['GET'])
+def test_webhook():
+    """Test endpoint to simulate a Jira webhook"""
+    print("🧪 Testing webhook with sample data")
+    
+    # Simulate a Jira issue creation
+    test_issue_key = "TEST-123"
+    test_summary = "Sample bug for testing webhook integration"
+    test_issue_type = "Bug"
+    
+    trigger_code_completion(test_issue_key, test_summary, test_issue_type)
+    
+    return jsonify({
+        "status": "test_completed",
+        "message": f"Test webhook triggered for {test_issue_key}",
+        "issue_key": test_issue_key,
+        "issue_type": test_issue_type
+    }), 200
 
 if __name__ == '__main__':
     print("🚀 Starting Jira LangGraph Webhook Server...")
