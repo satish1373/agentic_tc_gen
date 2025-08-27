@@ -15,3 +15,11 @@ langchain-openai
 openai
 python-dotenv
 requests
+flask
+jira
+python-dotenv
+requests
+flask
+jira
+python-dotenv
+requests

@@ -3,3 +3,15 @@ modules = ["python-3.12", "c-clang14", "cpp-clang14", "web"]
 [nix]
 channel = "stable-25_05"
 packages = ["bash"]
+
+[workflows]
+runButton = "Jira Webhook Server"
+
+[[workflows.workflow]]
+name = "Jira Webhook Server"
+author = 43524923
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python jira_webhook_server.py"
