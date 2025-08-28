@@ -6,7 +6,7 @@ channel = "stable-24.05"
 packages = ["bash", "ffmpeg-full", "glibcLocales"]
 
 [workflows]
-runButton = "Jira Webhook Server"
+runButton = "Combined Webhook Server"
 
 [[workflows.workflow]]
 name = "Jira Webhook Server"
@@ -29,6 +29,15 @@ mode = "sequential"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python gradio_test_generator.py"
+
+[[workflows.workflow]]
+name = "Combined Webhook Server"
+author = 43524923
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python jira_webhook_server.py"
 
 [deployment]
 run = ["sh", "-c", "python jira_webhook_server.py"]

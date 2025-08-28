@@ -1198,6 +1198,18 @@ def home():
             <strong>GET /test-github-integration</strong><br>
             Test GitHub integration (branch creation, file generation, PR creation)
         </div>
+        <div class="endpoint">
+            <strong>POST /github-sync</strong><br>
+            GitHub webhook endpoint for automatic code sync and deployment
+        </div>
+        <div class="endpoint">
+            <strong>GET /sync-status</strong><br>
+            Check GitHub sync configuration status
+        </div>
+        <div class="endpoint">
+            <strong>POST /manual-sync</strong><br>
+            Manually trigger sync from GitHub repository
+        </div>
         
         <h2>🚀 AI-Powered Features</h2>
         <div class="feature">
@@ -1432,12 +1444,83 @@ if __name__ == '__main__':
     print("🤖 LangGraph AI-powered test case generation enabled")
     print("⚠️  Make sure OPENAI_API_KEY is set in Secrets for full AI capabilities")
     
+    # Import and register GitHub sync routes
+    try:
+        from github_sync_webhook import sync_handler
+        
+        @app.route('/github-sync', methods=['POST'])
+        def handle_github_webhook():
+            """Handle GitHub webhook for automatic sync"""
+            try:
+                signature = request.headers.get('X-Hub-Signature-256')
+                if not sync_handler.verify_signature(request.data, signature):
+                    print("❌ Invalid GitHub webhook signature")
+                    return jsonify({"error": "Invalid signature"}), 401
+                
+                payload = request.get_json()
+                event_type = request.headers.get('X-GitHub-Event')
+                
+                print(f"📨 Received GitHub event: {event_type}")
+                
+                if event_type == 'push':
+                    result = sync_handler.handle_push_event(payload)
+                    print(f"✅ GitHub sync result: {result.get('status')}")
+                    return jsonify({
+                        "status": "processed",
+                        "event": "push", 
+                        "result": result
+                    }), 200
+                else:
+                    return jsonify({
+                        "status": "ignored",
+                        "event": event_type
+                    }), 200
+                    
+            except Exception as e:
+                print(f"❌ GitHub webhook error: {e}")
+                return jsonify({"error": str(e)}), 500
+        
+        @app.route('/sync-status', methods=['GET'])
+        def sync_status():
+            """Get GitHub sync status"""
+            return jsonify({
+                "github_secret_configured": bool(sync_handler.github_secret),
+                "auto_deploy_enabled": sync_handler.auto_deploy,
+                "target_branch": sync_handler.target_branch,
+                "webhook_url": f"{replit_url}/github-sync"
+            })
+        
+        @app.route('/manual-sync', methods=['POST'])
+        def manual_sync():
+            """Manually trigger GitHub sync"""
+            try:
+                print("🔄 Manual GitHub sync triggered")
+                
+                pull_result = sync_handler.pull_latest_changes()
+                if pull_result["status"] == "error":
+                    return jsonify(pull_result), 500
+                
+                deps_result = sync_handler.install_dependencies()
+                restart_result = sync_handler.restart_application()
+                
+                return jsonify({
+                    "status": "success",
+                    "pull": pull_result,
+                    "dependencies": deps_result,
+                    "restart": restart_result
+                })
+                
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+        
+        print("🔄 GitHub sync integration enabled")
+        print(f"🔗 GitHub webhook URL: {replit_url}/github-sync")
+        
+    except ImportError as e:
+        print(f"⚠️ GitHub sync integration disabled: {e}")
+    
     # Use production-ready settings with proper port configuration
     port = int(os.environ.get('PORT', 5000))
-    print(f"🌐 Starting Jira Webhook Server on 0.0.0.0:{port}")
-    
-    # Get the correct Replit URL
-    replit_url = os.environ.get('REPL_URL', 'https://workspace.satish73learnin.replit.dev')
-    print(f"🔗 Configure your Jira webhook to point to: {replit_url}/jira-webhook")
+    print(f"🌐 Starting Combined Webhook Server on 0.0.0.0:{port}")
     
     app.run(host='0.0.0.0', port=port, debug=True, threaded=True)
