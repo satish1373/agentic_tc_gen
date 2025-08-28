@@ -37,5 +37,8 @@ run = ["sh", "-c", "python jira_webhook_server.py"]
 localPort = 5000
 
 [[ports]]
+localPort = 7860
+
+[[ports]]
 localPort = 8080
 externalPort = 8080
