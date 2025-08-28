@@ -8,7 +8,21 @@ import json
 def test_webhook_connection():
     """Test the webhook endpoint connectivity"""
     
-    webhook_url = "https://workspace.satish73learnin.replit.dev/jira-webhook"
+    # Try to get the correct Replit URL
+    import os
+    base_url = os.environ.get('REPL_URL')
+    
+    if not base_url:
+        # Try common patterns
+        possible_urls = [
+            "https://workspace.satish73learnin.replit.dev",
+            "http://localhost:5000",
+            "http://127.0.0.1:5000"
+        ]
+    else:
+        possible_urls = [base_url]
+    
+    webhook_url = f"{possible_urls[0]}/jira-webhook"
     
     print("🧪 Testing Jira Webhook Connection")
     print(f"🔗 Testing URL: {webhook_url}")
@@ -70,26 +84,50 @@ def test_webhook_connection():
     except Exception as e:
         print(f"   ❌ POST request error: {e}")
     
-    # Test 3: Check if server is accessible from external
+    # Test 3: Check if server is accessible locally
     try:
-        print("\n3️⃣ Testing server accessibility...")
-        health_url = "https://workspace.satish73learnin.replit.dev/health"
-        response = requests.get(health_url, timeout=10)
+        print("\n3️⃣ Testing local server accessibility...")
+        local_urls = ["http://127.0.0.1:5000/health", "http://localhost:5000/health"]
         
-        if response.status_code == 200:
-            print("   ✅ Server is accessible externally")
+        for url in local_urls:
+            try:
+                response = requests.get(url, timeout=5)
+                if response.status_code == 200:
+                    print(f"   ✅ Local server accessible at {url}")
+                    break
+            except:
+                continue
         else:
-            print(f"   ⚠️ Unexpected status code: {response.status_code}")
+            print("   ❌ Local server not accessible")
             
     except Exception as e:
         print(f"   ❌ Server accessibility error: {e}")
+    
+    # Test 4: Check deployment URL if available
+    try:
+        print("\n4️⃣ Testing deployment accessibility...")
+        repl_url = os.environ.get('REPL_URL')
+        if repl_url:
+            health_url = f"{repl_url}/health"
+            response = requests.get(health_url, timeout=10)
+            if response.status_code == 200:
+                print(f"   ✅ Deployment accessible at {health_url}")
+            else:
+                print(f"   ⚠️ Deployment returned status: {response.status_code}")
+        else:
+            print("   ⚠️ REPL_URL environment variable not set")
+    except Exception as e:
+        print(f"   ❌ Deployment accessibility error: {e}")
     
     print("\n📋 Webhook Configuration Instructions:")
     print("=" * 50)
     print("1. Go to your Jira instance")
     print("2. Navigate to System → WebHooks")
     print("3. Create a new webhook with:")
-    print(f"   URL: {webhook_url}")
+    if os.environ.get('REPL_URL'):
+        print(f"   URL: {os.environ.get('REPL_URL')}/jira-webhook")
+    else:
+        print(f"   URL: {webhook_url} (update with your actual deployment URL)")
     print("   Events: Issue → created")
     print("4. Test the webhook in Jira")
     print("5. Check the Replit console for incoming requests")

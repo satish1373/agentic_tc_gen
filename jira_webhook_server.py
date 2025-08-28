@@ -852,7 +852,7 @@ def home():
         </div>
         
         <h2>⚙️ Configuration</h2>
-        <p><strong>Webhook URL:</strong> <code>https://workspace.satish73learnin.replit.dev/jira-webhook</code></p>
+        <p><strong>Webhook URL:</strong> <code>""" + os.environ.get('REPL_URL', 'https://workspace.satish73learnin.replit.dev') + """/jira-webhook</code></p>
         <p><strong>Supported Issue Types:</strong> Bug, Story, Task, Epic, Feature, Improvement</p>
         
         <h2>🔑 Required Environment Variables</h2>
@@ -968,7 +968,8 @@ def preview_ai_prompt():
 
 if __name__ == '__main__':
     print("🚀 Starting Jira LangGraph Webhook Server...")
-    print("🔗 Configure your Jira webhook to point to: https://workspace.satish73learnin.replit.dev/jira-webhook")
+    replit_url = os.environ.get('REPL_URL', 'https://workspace.satish73learnin.replit.dev')
+    print(f"🔗 Configure your Jira webhook to point to: {replit_url}/jira-webhook")
     print("🤖 LangGraph AI-powered test case generation enabled")
     print("⚠️  Make sure OPENAI_API_KEY is set in Secrets for full AI capabilities")
     
@@ -976,4 +977,9 @@ if __name__ == '__main__':
     import os
     port = int(os.environ.get('PORT', 5000))
     print(f"🌐 Starting server on 0.0.0.0:{port}")
-    app.run(host='0.0.0.0', port=port, debug=False)
+    
+    # Get the correct Replit URL
+    replit_url = os.environ.get('REPL_URL', 'https://workspace.satish73learnin.replit.dev')
+    print(f"🔗 Configure your Jira webhook to point to: {replit_url}/jira-webhook")
+    
+    app.run(host='0.0.0.0', port=port, debug=False, threaded=True)

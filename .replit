@@ -17,6 +17,10 @@ mode = "sequential"
 task = "workflow.run"
 args = "Jira Webhook Server"
 
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python jira_webhook_server.py"
+
 [[workflows.workflow]]
 name = "Gradio Test Generator UI"
 author = 43524923
