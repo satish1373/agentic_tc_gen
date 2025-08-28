@@ -11,7 +11,7 @@ runButton = "Jira Webhook Server"
 [[workflows.workflow]]
 name = "Jira Webhook Server"
 author = 43524923
-mode = "sequential"
+mode = "parallel"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
