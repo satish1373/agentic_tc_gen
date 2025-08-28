@@ -559,21 +559,38 @@ if JIRA_URL and JIRA_USERNAME and JIRA_API_TOKEN:
 else:
     print("⚠️ Jira credentials not configured - webhook will work but won't update Jira")
 
-@app.route('/jira-webhook', methods=['POST'])
+@app.route('/jira-webhook', methods=['POST', 'GET'])
 def handle_jira_webhook():
     """Handle incoming Jira webhook events"""
     try:
-        print("🔔 Received webhook request")
-        payload = request.get_json()
+        # Log request details for debugging
+        print(f"🔔 Received {request.method} request to /jira-webhook")
+        print(f"📋 Headers: {dict(request.headers)}")
+        print(f"🔗 Request URL: {request.url}")
+        print(f"📍 Remote Address: {request.environ.get('REMOTE_ADDR', 'Unknown')}")
+        
+        # Handle GET requests (for webhook verification)
+        if request.method == 'GET':
+            print("✅ Webhook endpoint verification successful")
+            return jsonify({
+                "status": "webhook_active",
+                "message": "Jira webhook endpoint is active and ready",
+                "timestamp": pd.Timestamp.now().isoformat()
+            }), 200
+        
+        # Handle POST requests (actual webhook events)
+        payload = request.get_json(force=True)
         
         if not payload:
             print("❌ No JSON payload received")
+            print(f"📝 Raw data: {request.get_data(as_text=True)}")
             return jsonify({"status": "error", "message": "No JSON payload"}), 400
         
         print(f"📦 Webhook Event: {payload.get('webhookEvent', 'Unknown')}")
         
-        # Log the full payload for debugging (remove in production)
+        # Log the full payload for debugging
         print(f"🔍 Payload keys: {list(payload.keys())}")
+        print(f"📄 Full payload (first 500 chars): {str(payload)[:500]}")
         
         # Check if this is an issue creation event
         if payload.get('webhookEvent') == 'jira:issue_created':
