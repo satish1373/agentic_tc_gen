@@ -232,13 +232,18 @@ class GradioTestCaseApp:
                     download_output = gr.File(
                         label="📥 Download Test Cases (JSON)",
                         visible=False,
-                        height=100
+                        height=100,
+                        interactive=False
                     )
                     
                     # Progress and stats will appear here
                     with gr.Group(visible=False) as stats_group:
                         gr.Markdown("### 📈 Quick Stats")
-                        stats_output = gr.JSON(label="Statistics", show_label=False)
+                        stats_output = gr.JSON(
+                            label="Statistics", 
+                            show_label=False,
+                            interactive=False
+                        )
             
             # Results Area
             gr.Markdown("---")
@@ -267,8 +272,11 @@ class GradioTestCaseApp:
             )
             
             # Auto-show download when file is ready
+            def update_download_visibility(file):
+                return gr.update(visible=file is not None)
+            
             download_output.change(
-                fn=lambda x: gr.update(visible=x is not None),
+                fn=update_download_visibility,
                 inputs=[download_output],
                 outputs=[download_output]
             )
