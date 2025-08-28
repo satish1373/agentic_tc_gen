@@ -1440,4 +1440,4 @@ if __name__ == '__main__':
     replit_url = os.environ.get('REPL_URL', 'https://workspace.satish73learnin.replit.dev')
     print(f"🔗 Configure your Jira webhook to point to: {replit_url}/jira-webhook")
     
-    app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
+    app.run(host='0.0.0.0', port=port, debug=True, threaded=True)
