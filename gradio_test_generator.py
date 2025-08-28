@@ -281,7 +281,6 @@ class GradioTestCaseApp:
             "share": True,
             "show_api": False,
             "debug": False,
-            "enable_queue": True,
             "max_threads": 10
         }
         default_kwargs.update(kwargs)
