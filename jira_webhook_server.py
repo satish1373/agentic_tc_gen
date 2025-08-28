@@ -3,6 +3,8 @@ from flask import Flask, request, jsonify
 import requests
 import json
 import os
+import base64
+import re
 from dotenv import load_dotenv
 from jira import JIRA
 from agentic_test_generator_1 import AgenticTestCaseGenerator
@@ -12,6 +14,321 @@ import pandas as pd
 
 # Initialize the enhanced generator
 enhanced_generator = AgenticTestCaseGenerator()
+
+class GitHubIntegration:
+    """GitHub integration for automatic branch and PR creation"""
+    
+    def __init__(self):
+        self.github_token = os.getenv('GITHUB_TOKEN')
+        self.github_owner = os.getenv('GITHUB_OWNER')
+        self.github_repo = os.getenv('GITHUB_REPO')
+        self.github_base_branch = os.getenv('GITHUB_BASE_BRANCH', 'main')
+        self.github_api = "https://api.github.com"
+        
+        # Check if GitHub is configured
+        self.github_enabled = all([
+            self.github_token, self.github_owner, self.github_repo
+        ])
+        
+        if self.github_enabled:
+            print("✅ GitHub integration enabled")
+        else:
+            print("⚠️ GitHub integration disabled - missing credentials")
+    
+    def slugify(self, s):
+        """Convert string to URL-friendly slug"""
+        s = s.lower()
+        s = re.sub(r'[^a-z0-9\-]+', '-', s)
+        s = re.sub(r'-+', '-', s).strip('-')
+        return s[:60]
+    
+    def gh_headers(self):
+        """Get GitHub API headers"""
+        return {
+            "Authorization": f"Bearer {self.github_token}",
+            "Accept": "application/vnd.github.v3+json"
+        }
+    
+    def get_base_sha(self):
+        """Get the SHA of the base branch"""
+        url = f"{self.github_api}/repos/{self.github_owner}/{self.github_repo}/git/ref/heads/{self.github_base_branch}"
+        r = requests.get(url, headers=self.gh_headers())
+        r.raise_for_status()
+        return r.json()["object"]["sha"]
+    
+    def create_branch(self, branch_name, base_sha):
+        """Create a new branch"""
+        url = f"{self.github_api}/repos/{self.github_owner}/{self.github_repo}/git/refs"
+        body = {"ref": f"refs/heads/{branch_name}", "sha": base_sha}
+        r = requests.post(url, headers=self.gh_headers(), json=body)
+        if r.status_code == 201:
+            return True
+        elif r.status_code == 422 and "Reference already exists" in r.text:
+            return True  # okay, branch exists
+        else:
+            r.raise_for_status()
+    
+    def get_file_sha(self, path, branch):
+        """Get the SHA of a file if it exists"""
+        url = f"{self.github_api}/repos/{self.github_owner}/{self.github_repo}/contents/{path}"
+        r = requests.get(url, headers=self.gh_headers(), params={"ref": branch})
+        if r.status_code == 200:
+            return r.json()["sha"]
+        return None
+    
+    def create_or_update_file(self, path, content_str, branch, commit_msg):
+        """Create or update a file in the repository"""
+        encoded = base64.b64encode(content_str.encode()).decode()
+        sha = self.get_file_sha(path, branch)
+        url = f"{self.github_api}/repos/{self.github_owner}/{self.github_repo}/contents/{path}"
+        payload = {"message": commit_msg, "content": encoded, "branch": branch}
+        if sha:
+            payload["sha"] = sha
+        r = requests.put(url, headers=self.gh_headers(), json=payload)
+        r.raise_for_status()
+        return r.json()
+    
+    def create_pull_request(self, title, head_branch, base_branch, body):
+        """Create a pull request"""
+        url = f"{self.github_api}/repos/{self.github_owner}/{self.github_repo}/pulls"
+        payload = {"title": title, "head": head_branch, "base": base_branch, "body": body}
+        r = requests.post(url, headers=self.gh_headers(), json=payload)
+        r.raise_for_status()
+        return r.json()
+    
+    def create_feature_files(self, issue_key, summary, issue_type, description, ai_results):
+        """Create comprehensive feature files for the issue"""
+        files_created = []
+        
+        # 1. Feature specification file
+        feature_spec = f"""# {issue_key} - {summary}
+
+## Issue Information
+- **Type**: {issue_type}
+- **Key**: {issue_key}
+- **Summary**: {summary}
+
+## Description
+{description}
+
+## AI Analysis Results
+- **Action Type**: {ai_results.get('action_plan', {}).get('action_type', 'Unknown')}
+- **Priority**: {ai_results.get('action_plan', {}).get('priority', 'Medium')}
+- **Estimated Effort**: {ai_results.get('action_plan', {}).get('estimated_effort', 'Medium')}
+
+## Implementation Steps
+{chr(10).join(f'{i+1}. {step}' for i, step in enumerate(ai_results.get('action_plan', {}).get('implementation_steps', [])))}
+
+## Testing Requirements
+{chr(10).join(f'- {req}' for req in ai_results.get('action_plan', {}).get('testing_requirements', []))}
+
+## Generated Files
+{chr(10).join(f'- {file}' for file in ai_results.get('results', {}).get('files_created', []))}
+
+---
+Source: Jira {issue_key}
+Generated automatically by Replit AI Integration
+"""
+        files_created.append(("features", f"{issue_key}.md", feature_spec))
+        
+        # 2. Implementation scaffold if it's a feature/task
+        if issue_type.lower() in ["feature", "new feature", "task", "story"]:
+            impl_content = self.create_implementation_scaffold(issue_key, summary, issue_type, description)
+            files_created.append(("src", f"{issue_key.lower().replace('-', '_')}.py", impl_content))
+        
+        # 3. Test specification file
+        test_spec = f"""# Test Specification for {issue_key}
+
+## Test Strategy
+Based on AI analysis, the following testing approach is recommended:
+
+### Test Types Required
+{chr(10).join(f'- {req}' for req in ai_results.get('action_plan', {}).get('testing_requirements', []))}
+
+### Generated Test Files
+{chr(10).join(f'- {file}' for file in ai_results.get('results', {}).get('files_created', []) if 'test' in file.lower())}
+
+### Manual Testing Checklist
+- [ ] Verify issue requirements are met
+- [ ] Test happy path scenarios
+- [ ] Test edge cases and error conditions
+- [ ] Validate integration with existing features
+- [ ] Performance testing (if applicable)
+
+---
+Generated automatically for Jira {issue_key}
+"""
+        files_created.append(("tests", f"test_spec_{issue_key.lower()}.md", test_spec))
+        
+        return files_created
+    
+    def create_implementation_scaffold(self, issue_key, summary, issue_type, description):
+        """Create implementation scaffold code"""
+        class_name = issue_key.replace('-', '_').title().replace('_', '')
+        
+        return f'''"""
+Implementation for {issue_key}: {summary}
+Generated automatically by Replit AI Integration
+"""
+
+import logging
+from typing import Dict, List, Any, Optional
+from datetime import datetime
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+class {class_name}:
+    """
+    Implementation class for {issue_key}
+    
+    Issue Type: {issue_type}
+    Summary: {summary}
+    Description: {description[:200]}{'...' if len(description) > 200 else ''}
+    """
+    
+    def __init__(self):
+        self.issue_key = "{issue_key}"
+        self.created_at = datetime.now()
+        logger.info(f"Initialized {{self.__class__.__name__}} for {{self.issue_key}}")
+    
+    def execute(self) -> Dict[str, Any]:
+        """
+        Main execution method for {issue_key}
+        
+        Returns:
+            Dict containing execution results
+        """
+        try:
+            logger.info(f"Starting execution for {{self.issue_key}}")
+            
+            # TODO: Implement actual functionality based on ticket requirements
+            # Refer to the feature specification in features/{issue_key}.md
+            
+            result = {{
+                "status": "completed",
+                "issue_key": self.issue_key,
+                "execution_time": datetime.now(),
+                "message": "Implementation placeholder - customize based on requirements"
+            }}
+            
+            logger.info(f"Successfully executed {{self.issue_key}}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error executing {{self.issue_key}}: {{str(e)}}")
+            raise
+    
+    def validate(self) -> bool:
+        """
+        Validate implementation meets requirements
+        
+        Returns:
+            bool: True if validation passes
+        """
+        # TODO: Add validation logic based on acceptance criteria
+        logger.info(f"Validating {{self.issue_key}} implementation")
+        return True
+
+# Usage example
+if __name__ == "__main__":
+    implementation = {class_name}()
+    
+    if implementation.validate():
+        result = implementation.execute()
+        print(f"Implementation result: {{result}}")
+    else:
+        print("Validation failed")
+'''
+    
+    def process_jira_issue(self, issue_key, summary, issue_type, description, ai_results):
+        """Process Jira issue: create branch, files, and PR"""
+        if not self.github_enabled:
+            print("⚠️ GitHub integration disabled - skipping GitHub actions")
+            return None
+        
+        try:
+            print(f"🔗 Creating GitHub branch and PR for {issue_key}")
+            
+            # Create branch name
+            branch_name = f"jira/{issue_key}-{self.slugify(summary)}"
+            
+            # Get base SHA and create branch
+            base_sha = self.get_base_sha()
+            self.create_branch(branch_name, base_sha)
+            print(f"✅ Created branch: {branch_name}")
+            
+            # Create files
+            files_to_create = self.create_feature_files(issue_key, summary, issue_type, description, ai_results)
+            
+            created_files = []
+            for folder, filename, content in files_to_create:
+                file_path = f"{folder}/{filename}"
+                commit_msg = f"[{issue_key}] Add {filename}"
+                
+                try:
+                    self.create_or_update_file(file_path, content, branch_name, commit_msg)
+                    created_files.append(file_path)
+                    print(f"✅ Created file: {file_path}")
+                except Exception as e:
+                    print(f"⚠️ Failed to create {file_path}: {e}")
+            
+            # Create PR
+            pr_title = f"[{issue_key}] {summary}"
+            pr_body = f"""## Auto-generated PR for Jira {issue_key}
+
+**Issue Type**: {issue_type}
+**Summary**: {summary}
+
+### Description
+{description[:500]}{'...' if len(description) > 500 else ''}
+
+### AI Analysis Results
+- **Action Type**: {ai_results.get('action_plan', {}).get('action_type', 'Unknown')}
+- **Priority**: {ai_results.get('action_plan', {}).get('priority', 'Medium')}
+- **Estimated Effort**: {ai_results.get('action_plan', {}).get('estimated_effort', 'Medium')}
+
+### Files Created
+{chr(10).join(f'- `{file}`' for file in created_files)}
+
+### Generated AI Files (in Replit)
+{chr(10).join(f'- `{file}`' for file in ai_results.get('results', {}).get('files_created', []))}
+
+### Next Steps
+1. Review the generated code and specifications
+2. Implement the TODOs in the scaffold files
+3. Run the generated tests
+4. Update documentation as needed
+
+---
+🤖 This PR was automatically created by Replit AI Integration.
+📋 Review the feature specification and implementation scaffold.
+🧪 Test cases have been generated and are available in the Replit workspace.
+
+**Branch**: `{branch_name}`
+**Jira Issue**: [{issue_key}]({os.getenv('JIRA_URL', '#')}/browse/{issue_key})
+"""
+            
+            pr = self.create_pull_request(pr_title, branch_name, self.github_base_branch, pr_body)
+            pr_url = pr.get("html_url")
+            
+            print(f"✅ Created PR: {pr_url}")
+            
+            return {
+                "branch_name": branch_name,
+                "pr_url": pr_url,
+                "files_created": created_files,
+                "pr_number": pr.get("number")
+            }
+            
+        except Exception as e:
+            error_msg = f"Error creating GitHub branch/PR: {str(e)}"
+            print(f"❌ {error_msg}")
+            return {"error": error_msg}
+
+# Initialize GitHub integration
+github_integration = GitHubIntegration()
 
 class ReplitAIIntegration:
     """Integration with Replit AI Assistant for intelligent actions"""
@@ -654,13 +971,24 @@ def trigger_code_completion(issue_key, summary, issue_type):
         print(f"📊 Actions completed: {len(ai_results['results']['actions_completed'])}")
         print(f"📁 Files created: {len(ai_results['results']['files_created'])}")
         
-        # Also generate traditional test cases
+        # Generate traditional test cases
         test_filename = generate_test_cases_for_jira_issue(issue_key, summary, issue_type)
         
-        # Update Jira issue with comprehensive results
-        update_jira_issue_with_ai_results(issue_key, ai_results, test_filename)
+        # Create GitHub branch and PR for supported issue types
+        github_result = None
+        if issue_type.lower() in ["feature", "new feature", "task", "story", "epic", "improvement"]:
+            github_result = github_integration.process_jira_issue(
+                issue_key, summary, issue_type, description, ai_results
+            )
         
-        return ai_results
+        # Update Jira issue with comprehensive results including GitHub info
+        update_jira_issue_with_ai_results(issue_key, ai_results, test_filename, github_result)
+        
+        return {
+            "ai_results": ai_results,
+            "github_result": github_result,
+            "test_filename": test_filename
+        }
         
     except Exception as e:
         error_msg = f"Error in AI integration: {str(e)}"
@@ -674,7 +1002,7 @@ def trigger_code_completion(issue_key, summary, issue_type):
 
 # Old test case generation functions removed - now using LangGraph AI generator
 
-def update_jira_issue_with_ai_results(issue_key, ai_results, test_filename=None):
+def update_jira_issue_with_ai_results(issue_key, ai_results, test_filename=None, github_result=None):
     """Update Jira issue with AI analysis and action results"""
     try:
         if not jira:
@@ -695,8 +1023,30 @@ def update_jira_issue_with_ai_results(issue_key, ai_results, test_filename=None)
 ### 🚀 Actions Completed
 {chr(10).join(f'✅ {action}' for action in ai_results['results']['actions_completed'])}
 
-### 📁 Files Generated
+### 📁 Files Generated (Replit)
 {chr(10).join(f'📄 `{file}`' for file in ai_results['results']['files_created'])}
+"""
+
+        # Add GitHub PR information if available
+        if github_result and not github_result.get('error'):
+            comment_text += f"""
+### 🔗 GitHub Integration
+📋 **Pull Request Created**: {github_result.get('pr_url', 'N/A')}
+🌿 **Branch**: `{github_result.get('branch_name', 'N/A')}`
+📁 **Repository Files Created**:
+{chr(10).join(f'📄 `{file}`' for file in github_result.get('files_created', []))}
+
+**Next Steps**:
+1. Review the generated PR and code scaffold
+2. Implement the TODOs in the generated files
+3. Run tests and validate functionality
+4. Merge PR after review
+"""
+        elif github_result and github_result.get('error'):
+            comment_text += f"""
+### ⚠️ GitHub Integration
+❌ **Error creating PR**: {github_result.get('error')}
+💡 **Note**: AI analysis and test generation completed successfully
 """
 
         if test_filename:
@@ -727,13 +1077,16 @@ The AI Assistant analyzed this ticket and recommended:
         jira.add_comment(issue, comment_text)
         print(f"✅ Updated Jira issue {issue_key} with comprehensive AI analysis")
         
-        # Add labels based on AI analysis
+        # Add labels based on AI analysis and GitHub integration
         try:
             action_type = ai_results.get('action_plan', {}).get('action_type', '')
             priority = ai_results.get('action_plan', {}).get('priority', '')
             
             labels = issue.fields.labels or []
             new_labels = [f"ai-{action_type}", f"priority-{priority.lower()}", "replit-automated"]
+            
+            if github_result and not github_result.get('error'):
+                new_labels.append("github-pr-created")
             
             for label in new_labels:
                 if label not in labels:
@@ -828,6 +1181,10 @@ def home():
             <strong>POST /ai-prompt-preview</strong><br>
             Preview AI prompts that would be generated for tickets
         </div>
+        <div class="endpoint">
+            <strong>GET /test-github-integration</strong><br>
+            Test GitHub integration (branch creation, file generation, PR creation)
+        </div>
         
         <h2>🚀 AI-Powered Features</h2>
         <div class="feature">
@@ -850,17 +1207,34 @@ def home():
             <strong>🏷️ Smart Labeling</strong><br>
             Automatically tags Jira issues with AI-generated labels based on analysis results
         </div>
+        <div class="feature">
+            <strong>🔗 GitHub Integration</strong><br>
+            Automatically creates GitHub branches, implementation scaffolds, and pull requests for new issues
+        </div>
+        <div class="feature">
+            <strong>📋 Feature Specifications</strong><br>
+            Generates comprehensive feature specifications and implementation guides in GitHub repository
+        </div>
         
         <h2>⚙️ Configuration</h2>
         <p><strong>Webhook URL:</strong> <code>""" + os.environ.get('REPL_URL', 'https://workspace.satish73learnin.replit.dev') + """/jira-webhook</code></p>
         <p><strong>Supported Issue Types:</strong> Bug, Story, Task, Epic, Feature, Improvement</p>
         
         <h2>🔑 Required Environment Variables</h2>
+        <h3>Core Integration</h3>
         <ul>
             <li><code>OPENAI_API_KEY</code> - For AI-powered analysis</li>
             <li><code>JIRA_URL</code> - Your Jira instance URL</li>
             <li><code>JIRA_USERNAME</code> - Jira username/email</li>
             <li><code>JIRA_API_TOKEN</code> - Jira API token</li>
+        </ul>
+        
+        <h3>GitHub Integration (Optional)</h3>
+        <ul>
+            <li><code>GITHUB_TOKEN</code> - GitHub Personal Access Token (repo scope)</li>
+            <li><code>GITHUB_OWNER</code> - GitHub username/organization</li>
+            <li><code>GITHUB_REPO</code> - Repository name</li>
+            <li><code>GITHUB_BASE_BRANCH</code> - Base branch (default: main)</li>
         </ul>
         
         <h2>📖 Usage Examples</h2>
@@ -965,6 +1339,78 @@ def preview_ai_prompt():
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route('/test-github-integration', methods=['GET'])
+def test_github_integration():
+    """Test GitHub integration with sample data"""
+    try:
+        if not github_integration.github_enabled:
+            return jsonify({
+                "status": "disabled",
+                "message": "GitHub integration is not configured. Add GITHUB_TOKEN, GITHUB_OWNER, and GITHUB_REPO to Secrets."
+            }), 400
+        
+        # Test with sample data
+        test_issue_key = "TEST-GITHUB-001"
+        test_summary = "Test GitHub integration with sample feature"
+        test_issue_type = "Feature"
+        test_description = "This is a test issue to verify GitHub integration functionality including branch creation, file generation, and PR creation."
+        
+        # Create mock AI results
+        mock_ai_results = {
+            "action_plan": {
+                "action_type": "code_generation",
+                "priority": "High",
+                "estimated_effort": "Medium",
+                "implementation_steps": [
+                    "Create feature specification",
+                    "Generate implementation scaffold",
+                    "Create test cases",
+                    "Document API requirements"
+                ],
+                "testing_requirements": [
+                    "Unit test the core functionality",
+                    "Integration test with existing features",
+                    "Test API endpoints",
+                    "Validate feature requirements"
+                ]
+            },
+            "results": {
+                "actions_completed": [
+                    "Generated intelligent test cases",
+                    "Created implementation scaffold",
+                    "Generated documentation"
+                ],
+                "files_created": [
+                    "test_github_integration_001.json",
+                    "implementation_test_github_001.py",
+                    "ai_analysis_test_github_001.md"
+                ],
+                "errors": []
+            }
+        }
+        
+        # Test GitHub integration
+        github_result = github_integration.process_jira_issue(
+            test_issue_key, test_summary, test_issue_type, test_description, mock_ai_results
+        )
+        
+        return jsonify({
+            "status": "success",
+            "message": "GitHub integration test completed",
+            "github_result": github_result,
+            "test_data": {
+                "issue_key": test_issue_key,
+                "summary": test_summary,
+                "issue_type": test_issue_type
+            }
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"GitHub integration test failed: {str(e)}"
+        }), 500
 
 if __name__ == '__main__':
     print("🚀 Starting Jira LangGraph Webhook Server...")

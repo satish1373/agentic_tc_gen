@@ -12,17 +12,12 @@ def test_webhook_connection():
     import os
     base_url = os.environ.get('REPL_URL')
     
-    if not base_url:
-        # Try common patterns
-        possible_urls = [
-            "https://workspace.satish73learnin.replit.dev",
-            "http://localhost:5000",
-            "http://127.0.0.1:5000"
-        ]
-    else:
-        possible_urls = [base_url]
+    # Check if server is running locally first
+    local_url = "http://127.0.0.1:5000"
+    external_url = base_url or "https://workspace.satish73learnin.replit.dev"
     
-    webhook_url = f"{possible_urls[0]}/jira-webhook"
+    # Test local first, then external
+    webhook_url = local_url + "/jira-webhook"
     
     print("🧪 Testing Jira Webhook Connection")
     print(f"🔗 Testing URL: {webhook_url}")
