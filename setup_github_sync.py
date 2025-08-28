@@ -77,16 +77,26 @@ def setup_github_webhook():
 
 def test_sync_functionality():
     """Test the sync functionality"""
+    # Use local URL for testing when running from within Replit
+    local_url = "http://127.0.0.1:5000"
     replit_url = os.getenv('REPL_URL', 'https://workspace.satish73learnin.replit.dev')
     
     print("\n🧪 Testing sync functionality...")
     
-    # Test 1: Check sync status
+    # Test 1: Check sync status - try local first, then external
     try:
-        response = requests.get(f"{replit_url}/sync-status")
+        test_url = local_url
+        try:
+            response = requests.get(f"{test_url}/sync-status", timeout=5)
+        except requests.exceptions.ConnectionError:
+            # If local fails, try external URL
+            test_url = replit_url
+            response = requests.get(f"{test_url}/sync-status", timeout=10)
+        
         if response.status_code == 200:
             status = response.json()
             print("✅ Sync status endpoint working")
+            print(f"   URL tested: {test_url}")
             print(f"   GitHub secret configured: {status['github_secret_configured']}")
             print(f"   Auto-deploy enabled: {status['auto_deploy_enabled']}")
             print(f"   Target branch: {status['target_branch']}")
@@ -98,12 +108,20 @@ def test_sync_functionality():
     # Test 2: Manual sync test
     try:
         print("\n🔄 Testing manual sync...")
-        response = requests.post(f"{replit_url}/manual-sync", 
-                               json={"restart": False})
+        test_url = local_url
+        try:
+            response = requests.post(f"{test_url}/manual-sync", 
+                                   json={"restart": False}, timeout=5)
+        except requests.exceptions.ConnectionError:
+            # If local fails, try external URL
+            test_url = replit_url
+            response = requests.post(f"{test_url}/manual-sync", 
+                                   json={"restart": False}, timeout=10)
         
         if response.status_code == 200:
             result = response.json()
             print("✅ Manual sync test successful")
+            print(f"   URL tested: {test_url}")
             print(f"   Pull status: {result.get('pull', {}).get('status')}")
             print(f"   Dependencies: {result.get('dependencies', {}).get('status')}")
         else:
