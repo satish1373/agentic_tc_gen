@@ -1000,8 +1000,6 @@ def trigger_code_completion(issue_key, summary, issue_type):
             pass
         return {"error": error_msg}
 
-# Old test case generation functions removed - now using LangGraph AI generator
-
 def update_jira_issue_with_ai_results(issue_key, ai_results, test_filename=None, github_result=None):
     """Update Jira issue with AI analysis and action results"""
     try:
