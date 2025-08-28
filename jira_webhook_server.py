@@ -7,13 +7,18 @@ import base64
 import re
 from dotenv import load_dotenv
 from jira import JIRA
-from agentic_test_generator_1 import AgenticTestCaseGenerator
 import subprocess
 import tempfile
 import pandas as pd
 
-# Initialize the enhanced generator
-enhanced_generator = AgenticTestCaseGenerator()
+# Initialize the enhanced generator - handle import gracefully
+try:
+    from agentic_test_generator_1 import AgenticTestCaseGenerator
+    enhanced_generator = AgenticTestCaseGenerator()
+    print("✅ AgenticTestCaseGenerator loaded successfully")
+except ImportError as e:
+    print(f"⚠️ Could not import AgenticTestCaseGenerator: {e}")
+    enhanced_generator = None
 
 class GitHubIntegration:
     """GitHub integration for automatic branch and PR creation"""
@@ -553,7 +558,14 @@ Please provide structured recommendations in this format:
         
         try:
             # Use existing test case generator with enhanced context
-            enhanced_generator = AgenticTestCaseGenerator()
+            if enhanced_generator is None:
+                return {
+                    "files": [],
+                    "test_count": 0,
+                    "status": "error",
+                    "error": "Enhanced generator not available"
+                }
+                
             requirements = [(issue_key, f"{summary} - {description}")]
             test_cases = enhanced_generator.generate_test_cases(requirements)
             
@@ -830,6 +842,9 @@ replit_ai = ReplitAIIntegration()
 def generate_test_cases_for_jira_issue(issue_key: str, summary: str, issue_type: str) -> str:
     """Generate test cases for Jira issue using enhanced generator"""
     try:
+        if enhanced_generator is None:
+            return f"Enhanced generator not available for {issue_key}"
+            
         # Create a requirement from the Jira issue
         requirements = [(issue_key, f"{summary} - Type: {issue_type}")]
         
