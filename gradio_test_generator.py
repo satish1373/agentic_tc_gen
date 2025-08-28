@@ -232,8 +232,7 @@ class GradioTestCaseApp:
                     download_output = gr.File(
                         label="📥 Download Test Cases (JSON)",
                         visible=False,
-                        height=100,
-                        interactive=False
+                        height=100
                     )
                     
                     # Progress and stats will appear here
@@ -241,8 +240,7 @@ class GradioTestCaseApp:
                         gr.Markdown("### 📈 Quick Stats")
                         stats_output = gr.JSON(
                             label="Statistics", 
-                            show_label=False,
-                            interactive=False
+                            show_label=False
                         )
             
             # Results Area
