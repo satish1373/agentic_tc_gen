@@ -23,6 +23,7 @@ class ReplitAIIntegration:
             "Task": self.handle_task_ticket,
             "Epic": self.handle_epic_ticket,
             "Feature": self.handle_feature_ticket,
+            "New Feature": self.handle_feature_ticket,
             "Improvement": self.handle_improvement_ticket
         }
     
@@ -88,7 +89,7 @@ Based on this Jira ticket, please analyze and recommend appropriate actions:
 - Consider code structure and architectural decisions
 - Identify testing and validation approaches
 """
-        elif issue_type == "Feature":
+        elif issue_type in ["Feature", "New Feature"]:
             base_prompt += """
 - Focus on feature specification and implementation plan
 - Consider API design and user interface requirements
@@ -271,7 +272,7 @@ Please provide structured recommendations in this format:
             files_created.append(impl_filename)
             
             # Generate API specification if it's a feature
-            if issue_type in ["Feature", "Story"]:
+            if issue_type in ["Feature", "New Feature", "Story"]:
                 api_filename = f"api_spec_{issue_key.lower()}.json"
                 api_content = self.create_api_specification(issue_key, summary)
                 
@@ -584,7 +585,7 @@ def handle_jira_webhook():
             print(f"✅ New Jira issue created: {issue_key} - {issue_summary} ({issue_type})")
             
             # Trigger code completion based on issue type
-            if issue_type in ['Bug', 'Task', 'Story', 'Feature', 'Epic', 'Improvement']:
+            if issue_type in ['Bug', 'Task', 'Story', 'Feature', 'New Feature', 'Epic', 'Improvement']:
                 print(f"🚀 Triggering AI-powered analysis for {issue_type}")
                 trigger_code_completion(issue_key, issue_summary, issue_type)
             else:
