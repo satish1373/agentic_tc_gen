@@ -1,0 +1,288 @@
+Below I’ll give a clear, safe, copy-and-paste end-to-end recipe so that when a Jira Feature / Task is created your Replit app will:
+
+receive the webhook,
+
+verify it,
+
+create a new Git branch in your repository,
+
+add/update one or more files (a scaffold/patch),
+
+open a GitHub Pull Request, and
+
+post the PR link back to the Jira issue.
+
+I’ll include (A) an architecture summary, (B) exact Replit + Jira settings you must create, (C) a ready-to-run Python webhook handler you can paste into your Repl, (D) step-by-step instructions to wire everything in dev and pre-deploy, and (E) security + production best practices.
+
+Because the flow uses Jira webhooks, GitHub commits/PR APIs and Replit features, I’m citing the relevant docs while keeping the instructions practical. 
+Atlassian Developer
+GitHub Docs
++1
+Replit Docs
++1
+
+A — Architecture (high level)
+
+Jira → webhook → Replit Webhook endpoint (Flask)
+
+Replit endpoint validates secret → decides action based on issue type (Task / Feature)
+
+Replit calls GitHub REST API to create a branch, add/update files (or edit code), and create a Pull Request. 
+GitHub Docs
++1
+
+Replit calls Jira REST API to comment on the issue with the PR URL (optional).
+
+Human reviewer verifies PR and merges (recommended).
+
+Why use GitHub as the “source of truth”? because programmatic changes to a codebase should be made in branches + PRs for audit and review (safer than auto-committing to main). Replit can be your editor + runner but the repo should live in GitHub (or your git host). Replit supports Git/GitHub integration and Deployments. 
+Replit Docs
++1
+
+B — Secrets & prerequisites (what to add in Replit before pasting code)
+
+In your Replit project go to Secrets (the lock icon) and add:
+
+WEBHOOK_SECRET = a long random token (used to validate Jira webhook or query param). 
+Replit Docs
+
+GITHUB_TOKEN = GitHub Personal Access Token (repo scope: create branches, create/modify files, create PRs).
+
+GITHUB_OWNER = your GitHub org/user name.
+
+GITHUB_REPO = repo name (the repo where code lives).
+
+GITHUB_BASE_BRANCH = e.g. main.
+
+JIRA_BASE_URL = https://yourcompany.atlassian.net (for comments).
+
+JIRA_USER_EMAIL & JIRA_API_TOKEN = for basic auth to call Jira REST (or use OAuth if preferred).
+
+Make sure your GITHUB_TOKEN has the repo scope (or permissions required by your org). Storing these in Replit Secrets keeps them out of source code. 
+Replit Docs
+
+C — Paste-in Python webhook receiver (ready to use)
+
+Create main.py in your Repl (Flask). This example:
+
+Checks the secret,
+
+Verifies issue type,
+
+Creates a jira/ISSUE-xxxx-<slug> branch,
+
+Writes features/ISSUE-KEY.md with the issue summary & description (you can change to edit source files),
+
+Opens a PR,
+
+Posts a comment back to the Jira issue.
+
+Install dependencies: add Flask and requests to requirements.txt.
+
+# main.py
+import os, base64, requests, json, re
+from flask import Flask, request, abort
+
+app = Flask(__name__)
+
+# config from Replit Secrets
+WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET")
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
+GITHUB_OWNER = os.environ.get("GITHUB_OWNER")
+GITHUB_REPO = os.environ.get("GITHUB_REPO")
+GITHUB_BASE_BRANCH = os.environ.get("GITHUB_BASE_BRANCH", "main")
+JIRA_BASE_URL = os.environ.get("JIRA_BASE_URL")
+JIRA_USER_EMAIL = os.environ.get("JIRA_USER_EMAIL")
+JIRA_API_TOKEN = os.environ.get("JIRA_API_TOKEN")
+
+GITHUB_API = "https://api.github.com"
+
+def slugify(s):
+    s = s.lower()
+    s = re.sub(r'[^a-z0-9\-]+', '-', s)
+    s = re.sub(r'-+', '-', s).strip('-')
+    return s[:60]
+
+def gh_headers():
+    return {
+        "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+
+def get_base_sha():
+    url = f"{GITHUB_API}/repos/{GITHUB_OWNER}/{GITHUB_REPO}/git/ref/heads/{GITHUB_BASE_BRANCH}"
+    r = requests.get(url, headers=gh_headers())
+    r.raise_for_status()
+    return r.json()["object"]["sha"]
+
+def create_branch(branch_name, base_sha):
+    url = f"{GITHUB_API}/repos/{GITHUB_OWNER}/{GITHUB_REPO}/git/refs"
+    body = {"ref": f"refs/heads/{branch_name}", "sha": base_sha}
+    r = requests.post(url, headers=gh_headers(), json=body)
+    if r.status_code == 201:
+        return True
+    elif r.status_code == 422 and "Reference already exists" in r.text:
+        return True  # okay, branch exists
+    else:
+        r.raise_for_status()
+
+def get_file_sha(path, branch):
+    url = f"{GITHUB_API}/repos/{GITHUB_OWNER}/{GITHUB_REPO}/contents/{path}"
+    r = requests.get(url, headers=gh_headers(), params={"ref": branch})
+    if r.status_code == 200:
+        return r.json()["sha"]
+    return None
+
+def create_or_update_file(path, content_str, branch, commit_msg):
+    encoded = base64.b64encode(content_str.encode()).decode()
+    sha = get_file_sha(path, branch)
+    url = f"{GITHUB_API}/repos/{GITHUB_OWNER}/{GITHUB_REPO}/contents/{path}"
+    payload = {"message": commit_msg, "content": encoded, "branch": branch}
+    if sha:
+        payload["sha"] = sha
+    r = requests.put(url, headers=gh_headers(), json=payload)
+    r.raise_for_status()
+    return r.json()
+
+def create_pull_request(title, head_branch, base_branch, body):
+    url = f"{GITHUB_API}/repos/{GITHUB_OWNER}/{GITHUB_REPO}/pulls"
+    payload = {"title": title, "head": head_branch, "base": base_branch, "body": body}
+    r = requests.post(url, headers=gh_headers(), json=payload)
+    r.raise_for_status()
+    return r.json()
+
+def comment_on_jira_issue(issue_key, comment):
+    if not (JIRA_BASE_URL and JIRA_USER_EMAIL and JIRA_API_TOKEN):
+        return
+    url = f"{JIRA_BASE_URL}/rest/api/3/issue/{issue_key}/comment"
+    auth = (JIRA_USER_EMAIL, JIRA_API_TOKEN)
+    payload = {"body": comment}
+    r = requests.post(url, auth=auth, json=payload, headers={"Content-Type":"application/json"})
+    r.raise_for_status()
+    return r.json()
+
+@app.route("/jira-webhook", methods=["POST"])
+def jira_webhook():
+    # verify secret:
+    incoming = request.headers.get("X-Webhook-Secret") or request.args.get("secret")
+    if WEBHOOK_SECRET and incoming != WEBHOOK_SECRET:
+        return ("Unauthorized", 401)
+
+    data = request.get_json(silent=True) or {}
+    # Jira webhook payload: check issue type/name
+    issue = data.get("issue") or {}
+    fields = issue.get("fields", {})
+    issuetype = fields.get("issuetype", {}).get("name", "")
+    issue_key = issue.get("key") or fields.get("issuetype", {}).get("id", "UNKNOWN")
+    summary = fields.get("summary", "") or data.get("issue",{}).get("fields",{}).get("summary","")
+    description = fields.get("description", "") or ""
+
+    # Adjust the set below to match your Jira issuetypes
+    if issuetype.lower() in ("feature", "feature request", "task", "story"):
+        # create branch, file and PR
+        branch_name = f"jira/{issue_key}-{slugify(summary)}"
+        base_sha = get_base_sha()
+        create_branch(branch_name, base_sha)
+
+        # create a simple markdown scaffold in repo under features/
+        path = f"features/{issue_key}.md"
+        content = f"# {issue_key} - {summary}\n\n{description}\n\nSource: Jira {issue_key}"
+        commit_msg = f"[{issue_key}] scaffold feature file"
+        create_or_update_file(path, content, branch_name, commit_msg)
+
+        pr_title = f"[{issue_key}] {summary}"
+        pr_body = f"Auto-created PR for Jira {issue_key} — {summary}\n\nThis PR contains scaffold changes for discussion."
+        pr = create_pull_request(pr_title, branch_name, GITHUB_BASE_BRANCH, pr_body)
+
+        # comment back to Jira with PR link
+        pr_url = pr.get("html_url")
+        comment_on_jira_issue(issue_key, f"Created PR: {pr_url} (branch `{branch_name}`) — please review.")
+
+        return ("PR created", 200)
+
+    # not a feature/task — ignore
+    return ("ignored", 200)
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 3000)))
+
+
+Notes on the code
+
+The code uses GitHub REST endpoints to create a branch and to create/update a file (PUT /repos/:owner/:repo/contents/:path) and POST /repos/:owner/:repo/pulls to create the PR. Those APIs are documented by GitHub. 
+GitHub Docs
++1
+
+It comments back to the Jira issue using Jira REST POST /rest/api/3/issue/{issueKey}/comment. You’ll need Jira credentials in Replit Secrets (API token + email) or use a service account. 
+Atlassian Developer
+
+D — Exact step-by-step wiring (dev → pre-deploy)
+1) In Replit
+
+Create a Repl (Python) and paste the main.py above and add Flask & requests to requirements.txt.
+
+Add the Replit Secrets listed in section B. (Replit Secrets are encrypted environment variables.) 
+Replit Docs
+
+Click Run. Copy your dev URL (preview) e.g. https://agentictcgen.satish73learnin.replit.dev/jira-webhook and append ?secret=... if you prefer query secret (we are expecting header X-Webhook-Secret or query param). (Preview endpoints work for development only.) 
+Replit Docs
+
+2) In Jira (admin) — create webhook
+
+Admin → Settings → System → Webhooks → Create webhook.
+
+Set URL to your Replit dev URL (or deployment URL later). If Jira allows a webhook secret token, set it to the same WEBHOOK_SECRET and validate in your handler from header X-Webhook-Secret. Otherwise include ?secret=<token> on the URL. (Atlassian docs explain webhook settings & custom payloads.) 
+Atlassian Developer
+Atlassian Documentation
+
+Choose events: Issue created (and optionally Issue updated if you want PR creation on transitions). Optionally add a JQL filter (e.g., issuetype in ("Feature","Task")) to reduce noise. 
+Atlassian Developer
+
+3) Test the flow (dev)
+
+Create a Jira Feature / Task in the project that matches your webhook filter.
+
+Watch Replit console logs — you should see the incoming payload, the branch creation and PR creation. The PR URL will be posted to the Jira issue as a comment.
+
+If the webhook fails, check Jira webhook audit and Replit logs. (In dev, preview URLs can change — for more persistent testing use Replit Deployments.) 
+Replit Docs
+
+4) Move to production (pre-deploy)
+
+In Replit: create a Deployment (Deployments create a stable https://<app>.replit.app URL). Use that URL in your Jira webhook. 
+Replit Docs
+
+Make sure Deployment has the same secrets configured (deployment secrets).
+
+Use a GitHub token that is allowed by your org (PAT or GitHub App). For org environments, prefer a GitHub App or narrowly scoped PAT. 
+GitHub Docs
+
+E — Important security & operational notes (read these)
+
+Do not auto-merge. Create PRs and require human review. Auto-merging code from Jira events is dangerous unless you have strong tests and governance.
+
+Secrets: keep GITHUB_TOKEN and JIRA_API_TOKEN in Replit Secrets. Don’t log secrets. 
+Replit Docs
+
+Idempotency / dedupe: Jira may retry webhooks. Store a processed webhook id or the issue’s last PR link (persist to Replit DB or a small datastore) to avoid duplicate PRs.
+
+Rate limits: GitHub APIs are rate limited — handle 403/429 gracefully. Use retries/backoff. 
+GitHub Docs
+
+Least privilege: give the GITHUB_TOKEN only the scopes needed (repo write on target repo) or use a GitHub App for finer control. 
+GitHub Docs
+
+Testing: test with a sandbox repo/project first, not with production code.
+
+Quick checklist you can copy/paste
+
+ Add Replit Secrets: WEBHOOK_SECRET, GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO, GITHUB_BASE_BRANCH, JIRA_BASE_URL, JIRA_USER_EMAIL, JIRA_API_TOKEN. 
+Replit Docs
+
+ Paste main.py and requirements.txt (Flask, requests) into Replit and Run.
+
+ Create Jira webhook pointing to https://<your-dev-repl>.replit.dev/jira-webhook (or Deployment URL) and set secret. 
+Atlassian Developer
+Atlassian Documentation
+
+ Create a test Feature/Task in Jira and confirm PR created in GitHub.
