@@ -277,7 +277,7 @@ class GradioTestCaseApp:
         """Launch the Gradio interface"""
         default_kwargs = {
             "server_name": "0.0.0.0",
-            "server_port": 7860,
+            "server_port": 8080,
             "share": False,
             "show_api": False,
             "debug": True

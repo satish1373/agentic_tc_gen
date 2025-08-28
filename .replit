@@ -1,8 +1,8 @@
 modules = ["python-3.12", "c-clang14", "cpp-clang14", "web"]
-run = "python agentic_test_generator_1.py"
+run = "python jira_webhook_server.py"
 
 [nix]
-channel = "stable-25_05"
+channel = "stable-24.05"
 packages = ["bash", "ffmpeg-full", "glibcLocales"]
 
 [workflows]
@@ -31,8 +31,10 @@ run = ["sh", "-c", "python jira_webhook_server.py"]
 
 [[ports]]
 localPort = 5000
-externalPort = 5000
+externalPort = 80
+exposeLocalhost = true
 
 [[ports]]
-localPort = 7860
-externalPort = 80
+localPort = 8080
+externalPort = 8080
+exposeLocalhost = true
