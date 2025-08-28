@@ -3,7 +3,7 @@ run = "python agentic_test_generator_1.py"
 
 [nix]
 channel = "stable-25_05"
-packages = ["bash"]
+packages = ["bash", "ffmpeg-full", "glibcLocales"]
 
 [workflows]
 runButton = "Jira Webhook Server"
@@ -31,3 +31,7 @@ run = ["sh", "-c", "python jira_webhook_server.py"]
 
 [[ports]]
 localPort = 5000
+
+[[ports]]
+localPort = 7860
+externalPort = 80
