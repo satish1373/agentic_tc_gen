@@ -287,7 +287,8 @@ class GradioTestCaseApp:
         default_kwargs.update(kwargs)
         
         print("🚀 Launching AI Test Case Generator...")
-        print(f"🌐 Server will be available at: http://0.0.0.0:{default_kwargs['server_port']}")
+        print(f"🌐 Gradio UI will be available at: http://0.0.0.0:{default_kwargs['server_port']}")
+        print(f"🔗 Access via: https://workspace.satish73learnin.replit.dev:{default_kwargs['server_port']}")
         
         return self.interface.launch(**default_kwargs)
 

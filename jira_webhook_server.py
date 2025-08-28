@@ -1433,9 +1433,8 @@ if __name__ == '__main__':
     print("⚠️  Make sure OPENAI_API_KEY is set in Secrets for full AI capabilities")
     
     # Use production-ready settings with proper port configuration
-    import os
     port = int(os.environ.get('PORT', 5000))
-    print(f"🌐 Starting server on 0.0.0.0:{port}")
+    print(f"🌐 Starting Jira Webhook Server on 0.0.0.0:{port}")
     
     # Get the correct Replit URL
     replit_url = os.environ.get('REPL_URL', 'https://workspace.satish73learnin.replit.dev')
