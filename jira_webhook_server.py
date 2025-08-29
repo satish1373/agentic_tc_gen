@@ -1449,62 +1449,37 @@ if __name__ == '__main__':
     print("🤖 LangGraph AI-powered test case generation enabled")
     print("⚠️  Make sure OPENAI_API_KEY is set in Secrets for full AI capabilities")
     
-    # Start background git sync service
-    try:
-        from git_sync_service import start_git_sync_service, get_sync_status
-        
-        # Start git sync every 60 seconds (1 minute)
-        start_git_sync_service(60)
-        print("🔄 Background git sync service started (1 minute intervals)")
-        
-        # Add endpoint to check sync status
-        @app.route('/git-sync-status', methods=['GET'])
-        def git_sync_status():
-            """Check git sync service status"""
-            try:
-                status = get_sync_status()
+    # Git sync is handled by the Auto Git Sync workflow
+    print("ℹ️ Git sync is managed by the Auto Git Sync workflow")
+    
+    # Add endpoint to check sync status
+    @app.route('/git-sync-status', methods=['GET'])
+    def git_sync_status():
+        """Check git sync service status"""
+        try:
+            # Check if auto_git_sync process is running by looking at log
+            import os
+            log_file = "git_sync.log"
+            if os.path.exists(log_file):
+                with open(log_file, 'r') as f:
+                    lines = f.readlines()
+                    recent_lines = lines[-10:] if len(lines) > 10 else lines
+                    return jsonify({
+                        "git_sync_service": {
+                            "running": True,
+                            "recent_log": [line.strip() for line in recent_lines]
+                        },
+                        "message": "Git sync handled by Auto Git Sync workflow"
+                    }), 200
+            else:
                 return jsonify({
-                    "git_sync_service": status,
-                    "message": "Git sync service status"
+                    "git_sync_service": {
+                        "running": False,
+                        "message": "No git sync log found"
+                    }
                 }), 200
-            except Exception as e:
-                return jsonify({"error": str(e)}), 500
-        
-        @app.route('/git-sync-control', methods=['POST'])
-        def git_sync_control():
-            """Control git sync service (start/stop/restart)"""
-            try:
-                from git_sync_service import start_git_sync_service, stop_git_sync_service
-                
-                data = request.get_json() or {}
-                action = data.get('action', '').lower()
-                
-                if action == 'start':
-                    interval = data.get('interval', 60)
-                    start_git_sync_service(interval)
-                    return jsonify({"message": f"Git sync service started with {interval}s interval"}), 200
-                
-                elif action == 'stop':
-                    stop_git_sync_service()
-                    return jsonify({"message": "Git sync service stopped"}), 200
-                
-                elif action == 'restart':
-                    stop_git_sync_service()
-                    time.sleep(2)
-                    interval = data.get('interval', 60)
-                    start_git_sync_service(interval)
-                    return jsonify({"message": f"Git sync service restarted with {interval}s interval"}), 200
-                
-                else:
-                    return jsonify({"error": "Invalid action. Use: start, stop, or restart"}), 400
-                    
-            except Exception as e:
-                return jsonify({"error": str(e)}), 500
-        
-    except ImportError as e:
-        print(f"⚠️ Git sync service not available: {e}")
-    except Exception as e:
-        print(f"⚠️ Failed to start git sync service: {e}")
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
     
     # Import and register GitHub sync routes
     try:

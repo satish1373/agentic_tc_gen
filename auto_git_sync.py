@@ -40,10 +40,33 @@ class AutoGitSync:
         self.remote_name = 'origin'
         self.branch_name = self.get_current_branch()
         
+        # Configure git to handle divergent branches automatically
+        self.configure_git()
+        
         logger.info(f"🔄 Auto Git Sync initialized")
         logger.info(f"📋 Branch: {self.branch_name}")
         logger.info(f"⏱️ Sync interval: {sync_interval} seconds")
         logger.info(f"🤖 Auto-commit: {auto_commit}")
+    
+    def configure_git(self):
+        """Configure git settings for automatic sync"""
+        try:
+            # Set pull strategy to merge (handles divergent branches)
+            self.run_git_command(
+                ['git', 'config', 'pull.rebase', 'false'],
+                "Configuring git pull strategy"
+            )
+            
+            # Set push strategy to simple
+            self.run_git_command(
+                ['git', 'config', 'push.default', 'simple'],
+                "Configuring git push strategy"
+            )
+            
+            logger.info("✅ Git configuration completed")
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Git configuration warning: {str(e)}")
     
     def run_git_command(self, command, description=""):
         """Run a git command and return result"""
@@ -144,16 +167,24 @@ class AutoGitSync:
             logger.info("📋 No remote changes to pull")
             return {"status": "no_changes", "output": "No remote changes"}
         
-        # Pull changes
+        # Try pull with merge strategy (handles divergent branches)
         pull_result = self.run_git_command(
-            ['git', 'pull', self.remote_name, self.branch_name],
-            "Pulling changes"
+            ['git', 'pull', '--no-rebase', self.remote_name, self.branch_name],
+            "Pulling changes with merge strategy"
         )
+        
+        # If pull still fails due to divergent branches, reset to remote
+        if pull_result["status"] != "success" and "divergent branches" in pull_result.get("output", ""):
+            logger.warning("⚠️ Divergent branches detected, resetting to remote state")
+            reset_result = self.run_git_command(
+                ['git', 'reset', '--hard', f'{self.remote_name}/{self.branch_name}'],
+                "Resetting to remote state"
+            )
+            return reset_result
         
         # Handle merge conflicts
         if "CONFLICT" in pull_result.get("output", ""):
-            logger.warning("⚠️ Merge conflicts detected")
-            # Reset to remote state (prioritize remote changes)
+            logger.warning("⚠️ Merge conflicts detected, resetting to remote state")
             reset_result = self.run_git_command(
                 ['git', 'reset', '--hard', f'{self.remote_name}/{self.branch_name}'],
                 "Resetting to remote state"
