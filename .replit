@@ -39,6 +39,15 @@ mode = "sequential"
 task = "shell.exec"
 args = "python jira_webhook_server.py"
 
+[[workflows.workflow]]
+name = "Auto Git Sync"
+author = 43524923
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python auto_git_sync.py --interval 60"
+
 [deployment]
 run = ["sh", "-c", "python jira_webhook_server.py"]
 

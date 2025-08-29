@@ -5,6 +5,7 @@ import json
 import os
 import base64
 import re
+import time
 from dotenv import load_dotenv
 from jira import JIRA
 import subprocess
@@ -1447,6 +1448,63 @@ if __name__ == '__main__':
     print(f"🔗 Configure your Jira webhook to point to: {replit_url}/jira-webhook")
     print("🤖 LangGraph AI-powered test case generation enabled")
     print("⚠️  Make sure OPENAI_API_KEY is set in Secrets for full AI capabilities")
+    
+    # Start background git sync service
+    try:
+        from git_sync_service import start_git_sync_service, get_sync_status
+        
+        # Start git sync every 60 seconds (1 minute)
+        start_git_sync_service(60)
+        print("🔄 Background git sync service started (1 minute intervals)")
+        
+        # Add endpoint to check sync status
+        @app.route('/git-sync-status', methods=['GET'])
+        def git_sync_status():
+            """Check git sync service status"""
+            try:
+                status = get_sync_status()
+                return jsonify({
+                    "git_sync_service": status,
+                    "message": "Git sync service status"
+                }), 200
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+        
+        @app.route('/git-sync-control', methods=['POST'])
+        def git_sync_control():
+            """Control git sync service (start/stop/restart)"""
+            try:
+                from git_sync_service import start_git_sync_service, stop_git_sync_service
+                
+                data = request.get_json() or {}
+                action = data.get('action', '').lower()
+                
+                if action == 'start':
+                    interval = data.get('interval', 60)
+                    start_git_sync_service(interval)
+                    return jsonify({"message": f"Git sync service started with {interval}s interval"}), 200
+                
+                elif action == 'stop':
+                    stop_git_sync_service()
+                    return jsonify({"message": "Git sync service stopped"}), 200
+                
+                elif action == 'restart':
+                    stop_git_sync_service()
+                    time.sleep(2)
+                    interval = data.get('interval', 60)
+                    start_git_sync_service(interval)
+                    return jsonify({"message": f"Git sync service restarted with {interval}s interval"}), 200
+                
+                else:
+                    return jsonify({"error": "Invalid action. Use: start, stop, or restart"}), 400
+                    
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+        
+    except ImportError as e:
+        print(f"⚠️ Git sync service not available: {e}")
+    except Exception as e:
+        print(f"⚠️ Failed to start git sync service: {e}")
     
     # Import and register GitHub sync routes
     try:
