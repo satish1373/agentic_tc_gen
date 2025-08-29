@@ -167,29 +167,51 @@ class AutoGitSync:
             logger.info("📋 No remote changes to pull")
             return {"status": "no_changes", "output": "No remote changes"}
         
-        # Try pull with merge strategy (handles divergent branches)
+        # First try a simple pull
         pull_result = self.run_git_command(
-            ['git', 'pull', '--no-rebase', self.remote_name, self.branch_name],
-            "Pulling changes with merge strategy"
+            ['git', 'pull', self.remote_name, self.branch_name],
+            "Attempting simple pull"
         )
         
-        # If pull still fails due to divergent branches, reset to remote
-        if pull_result["status"] != "success" and "divergent branches" in pull_result.get("output", ""):
-            logger.warning("⚠️ Divergent branches detected, resetting to remote state")
-            reset_result = self.run_git_command(
-                ['git', 'reset', '--hard', f'{self.remote_name}/{self.branch_name}'],
-                "Resetting to remote state"
-            )
-            return reset_result
-        
-        # Handle merge conflicts
-        if "CONFLICT" in pull_result.get("output", ""):
-            logger.warning("⚠️ Merge conflicts detected, resetting to remote state")
-            reset_result = self.run_git_command(
-                ['git', 'reset', '--hard', f'{self.remote_name}/{self.branch_name}'],
-                "Resetting to remote state"
-            )
-            return reset_result
+        # If pull fails due to divergent branches, handle it
+        if pull_result["status"] != "success":
+            error_output = pull_result.get("output", "")
+            
+            if "divergent branches" in error_output or "Need to specify how to reconcile" in error_output:
+                logger.warning("⚠️ Divergent branches detected, trying merge strategy")
+                
+                # Try pull with explicit merge strategy
+                merge_pull = self.run_git_command(
+                    ['git', 'pull', '--no-rebase', '--no-ff', self.remote_name, self.branch_name],
+                    "Pulling with merge strategy"
+                )
+                
+                if merge_pull["status"] == "success":
+                    return merge_pull
+                
+                # If merge fails, reset to remote state (prioritize remote)
+                logger.warning("⚠️ Merge failed, resetting to remote state")
+                reset_result = self.run_git_command(
+                    ['git', 'reset', '--hard', f'{self.remote_name}/{self.branch_name}'],
+                    "Resetting to remote state"
+                )
+                return reset_result
+            
+            elif "non-fast-forward" in error_output:
+                logger.warning("⚠️ Non-fast-forward update, resetting to remote")
+                reset_result = self.run_git_command(
+                    ['git', 'reset', '--hard', f'{self.remote_name}/{self.branch_name}'],
+                    "Resetting to remote state"
+                )
+                return reset_result
+            
+            elif "CONFLICT" in error_output:
+                logger.warning("⚠️ Merge conflicts detected, resetting to remote state")
+                reset_result = self.run_git_command(
+                    ['git', 'reset', '--hard', f'{self.remote_name}/{self.branch_name}'],
+                    "Resetting to remote state"
+                )
+                return reset_result
         
         return pull_result
     
