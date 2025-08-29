@@ -1453,7 +1453,13 @@ if __name__ == '__main__':
             """Handle GitHub webhook for automatic sync"""
             try:
                 signature = request.headers.get('X-Hub-Signature-256')
-                if not sync_handler.verify_signature(request.data, signature):
+                payload_data = request.data
+                
+                print(f"🔔 Received GitHub webhook")
+                print(f"📋 Headers: {dict(request.headers)}")
+                print(f"🔗 Signature: {signature}")
+                
+                if not sync_handler.verify_signature(payload_data, signature):
                     print("❌ Invalid GitHub webhook signature")
                     return jsonify({"error": "Invalid signature"}), 401
                 
@@ -1465,12 +1471,27 @@ if __name__ == '__main__':
                 if event_type == 'push':
                     result = sync_handler.handle_push_event(payload)
                     print(f"✅ GitHub sync result: {result.get('status')}")
+                    
+                    # If sync was successful, log the changes
+                    if result.get('status') != 'error':
+                        commits = payload.get('commits', [])
+                        print(f"📦 Synced {len(commits)} commits to Replit")
+                        for commit in commits[:3]:  # Show first 3 commits
+                            print(f"   📝 {commit.get('message', 'No message')[:50]}...")
+                    
                     return jsonify({
                         "status": "processed",
                         "event": "push", 
                         "result": result
                     }), 200
+                elif event_type == 'pull_request':
+                    print("📋 Pull request event received - no action needed")
+                    return jsonify({
+                        "status": "acknowledged",
+                        "event": event_type
+                    }), 200
                 else:
+                    print(f"⏭️ Ignoring event type: {event_type}")
                     return jsonify({
                         "status": "ignored",
                         "event": event_type
@@ -1487,7 +1508,13 @@ if __name__ == '__main__':
                 "github_secret_configured": bool(sync_handler.github_secret),
                 "auto_deploy_enabled": sync_handler.auto_deploy,
                 "target_branch": sync_handler.target_branch,
-                "webhook_url": f"{replit_url}/github-sync"
+                "webhook_url": f"{replit_url}/github-sync",
+                "github_integration": {
+                    "enabled": github_integration.github_enabled,
+                    "owner": github_integration.github_owner,
+                    "repo": github_integration.github_repo,
+                    "base_branch": github_integration.github_base_branch
+                }
             })
         
         @app.route('/manual-sync', methods=['POST'])
@@ -1501,13 +1528,48 @@ if __name__ == '__main__':
                     return jsonify(pull_result), 500
                 
                 deps_result = sync_handler.install_dependencies()
-                restart_result = sync_handler.restart_application()
+                
+                # Don't restart the main application for manual sync
+                print("⚠️ Manual sync completed - application not restarted")
                 
                 return jsonify({
                     "status": "success",
                     "pull": pull_result,
                     "dependencies": deps_result,
-                    "restart": restart_result
+                    "restart": {"status": "skipped", "message": "Manual sync - no restart"}
+                })
+                
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+        
+        @app.route('/test-sync', methods=['GET'])
+        def test_sync():
+            """Test the sync functionality"""
+            try:
+                print("🧪 Testing GitHub sync functionality")
+                
+                # Test git status
+                git_status = subprocess.run(['git', 'status', '--porcelain'], 
+                                          capture_output=True, text=True)
+                
+                # Test git remote
+                git_remote = subprocess.run(['git', 'remote', '-v'], 
+                                          capture_output=True, text=True)
+                
+                # Test git branch
+                git_branch = subprocess.run(['git', 'branch', '--show-current'], 
+                                          capture_output=True, text=True)
+                
+                return jsonify({
+                    "status": "success",
+                    "git_status": git_status.stdout.strip(),
+                    "git_remote": git_remote.stdout.strip(),
+                    "current_branch": git_branch.stdout.strip(),
+                    "sync_config": {
+                        "auto_deploy": sync_handler.auto_deploy,
+                        "target_branch": sync_handler.target_branch,
+                        "webhook_secret_configured": bool(sync_handler.github_secret)
+                    }
                 })
                 
             except Exception as e:
