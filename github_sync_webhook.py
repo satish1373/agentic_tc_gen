@@ -35,8 +35,33 @@ class GitHubSyncHandler:
         
         return hmac.compare_digest(expected_signature, signature_header)
     
+    def fetch_all_branches(self):
+        """Fetch all branches and prune deleted ones"""
+        try:
+            logger.info("🔄 Fetching all branches from GitHub...")
+            
+            # Fetch all branches and prune deleted ones
+            fetch_result = subprocess.run(['git', 'fetch', 'origin', '--prune'], 
+                                        capture_output=True, text=True)
+            if fetch_result.returncode != 0:
+                logger.warning(f"⚠️ Git fetch warning: {fetch_result.stderr}")
+                return {"status": "warning", "output": fetch_result.stderr}
+            
+            # Get list of remote branches
+            remote_branches = subprocess.run(['git', 'branch', '-r'], 
+                                           capture_output=True, text=True)
+            
+            logger.info(f"📋 Available remote branches:\n{remote_branches.stdout}")
+            
+            return {"status": "success", "output": fetch_result.stdout, "remote_branches": remote_branches.stdout}
+            
+        except Exception as e:
+            error_msg = f"Error fetching branches: {str(e)}"
+            logger.error(f"❌ {error_msg}")
+            return {"status": "error", "error": error_msg}
+
     def pull_latest_changes(self):
-        """Pull latest changes from GitHub"""
+        """Pull latest changes from GitHub with full branch sync"""
         try:
             logger.info("📥 Pulling latest changes from GitHub...")
             
@@ -46,11 +71,10 @@ class GitHubSyncHandler:
                 logger.error("❌ Not a git repository")
                 return {"status": "error", "error": "Not a git repository"}
             
-            # Fetch latest changes first
-            fetch_result = subprocess.run(['git', 'fetch', 'origin'], 
-                                        capture_output=True, text=True)
-            if fetch_result.returncode != 0:
-                logger.warning(f"⚠️ Git fetch warning: {fetch_result.stderr}")
+            # Fetch all branches first (including new ones)
+            fetch_result = self.fetch_all_branches()
+            if fetch_result["status"] == "error":
+                return fetch_result
             
             # Check current branch
             current_branch = subprocess.run(['git', 'branch', '--show-current'], 
@@ -71,7 +95,12 @@ class GitHubSyncHandler:
             
             if result.returncode == 0:
                 logger.info(f"✅ Git pull successful: {result.stdout}")
-                return {"status": "success", "output": result.stdout, "branch": self.target_branch}
+                return {
+                    "status": "success", 
+                    "output": result.stdout, 
+                    "branch": self.target_branch,
+                    "fetch_result": fetch_result
+                }
             else:
                 # Try to handle merge conflicts or other issues
                 logger.warning(f"⚠️ Git pull had issues: {result.stderr}")
@@ -82,7 +111,12 @@ class GitHubSyncHandler:
                 
                 if reset_result.returncode == 0:
                     logger.info("✅ Git reset successful - repository synced")
-                    return {"status": "success", "output": "Repository reset to match remote", "branch": self.target_branch}
+                    return {
+                        "status": "success", 
+                        "output": "Repository reset to match remote", 
+                        "branch": self.target_branch,
+                        "fetch_result": fetch_result
+                    }
                 else:
                     error_msg = f"Git operations failed: {result.stderr}"
                     logger.error(f"❌ {error_msg}")

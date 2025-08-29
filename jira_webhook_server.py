@@ -1210,6 +1210,10 @@ def home():
             <strong>POST /manual-sync</strong><br>
             Manually trigger sync from GitHub repository
         </div>
+        <div class="endpoint">
+            <strong>POST /refresh-branches</strong><br>
+            Refresh and fetch all branches from GitHub (fixes missing merged branches)
+        </div>
         
         <h2>🚀 AI-Powered Features</h2>
         <div class="feature">
@@ -1542,6 +1546,34 @@ if __name__ == '__main__':
             except Exception as e:
                 return jsonify({"error": str(e)}), 500
         
+        @app.route('/refresh-branches', methods=['POST'])
+        def refresh_branches():
+            """Refresh and fetch all branches from GitHub"""
+            try:
+                print("🔄 Refreshing branches from GitHub...")
+                
+                # Fetch all branches
+                fetch_result = sync_handler.fetch_all_branches()
+                
+                # Get all local branches
+                local_branches = subprocess.run(['git', 'branch'], 
+                                              capture_output=True, text=True)
+                
+                # Get all remote branches  
+                remote_branches = subprocess.run(['git', 'branch', '-r'], 
+                                               capture_output=True, text=True)
+                
+                return jsonify({
+                    "status": "success",
+                    "message": "Branches refreshed successfully",
+                    "fetch_result": fetch_result,
+                    "local_branches": local_branches.stdout.strip().split('\n'),
+                    "remote_branches": remote_branches.stdout.strip().split('\n')
+                })
+                
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
         @app.route('/test-sync', methods=['GET'])
         def test_sync():
             """Test the sync functionality"""
@@ -1560,11 +1592,16 @@ if __name__ == '__main__':
                 git_branch = subprocess.run(['git', 'branch', '--show-current'], 
                                           capture_output=True, text=True)
                 
+                # Test all branches
+                all_branches = subprocess.run(['git', 'branch', '-a'], 
+                                            capture_output=True, text=True)
+                
                 return jsonify({
                     "status": "success",
                     "git_status": git_status.stdout.strip(),
                     "git_remote": git_remote.stdout.strip(),
                     "current_branch": git_branch.stdout.strip(),
+                    "all_branches": all_branches.stdout.strip().split('\n'),
                     "sync_config": {
                         "auto_deploy": sync_handler.auto_deploy,
                         "target_branch": sync_handler.target_branch,
