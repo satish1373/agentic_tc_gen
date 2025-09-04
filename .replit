@@ -86,8 +86,8 @@ args = "python unified_automation.py"
 waitForPort = 8000
 
 [deployment]
-run = ["sh", "-c", "python jira_webhook_server.py"]
-deploymentTarget = "cloudrun"
+run = ["python", "unified_automation.py"]
+deploymentTarget = "vm"
 
 [[ports]]
 localPort = 5000
