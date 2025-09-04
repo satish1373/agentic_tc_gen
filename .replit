@@ -1,4 +1,4 @@
-modules = ["python-3.12", "c-clang14", "cpp-clang14", "web"]
+modules = ["c-clang14", "cpp-clang14", "web", "python-3.11"]
 run = "python jira_webhook_server.py"
 
 [nix]
@@ -55,11 +55,22 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Todo App"
+args = "Automation System"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Automation System"
+args = "Todo App"
+
+[[workflows.workflow]]
+name = "Automation System"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python unified_automation.py"
+
+[workflows.workflow.metadata]
+outputType = "console"
 
 [[workflows.workflow]]
 name = "Todo App"
@@ -73,37 +84,22 @@ waitForPort = 5000
 [workflows.workflow.metadata]
 outputType = "webview"
 
-[[workflows.workflow]]
-name = "Automation System"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python unified_automation.py"
-waitForPort = 8000
-
 [deployment]
-run = ["python", "unified_automation.py"]
+run = ["gunicorn", "--config", "gunicorn_config.py", "production_app:app"]
 deploymentTarget = "vm"
+build = ["pip", "install", "-r", "requirements.txt"]
 
 [[ports]]
 localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 7860
-externalPort = 3000
+localPort = 8000
+externalPort = 80
 
 [[ports]]
 localPort = 8080
 externalPort = 8080
-
-[[ports]]
-localPort = 8000
-externalPort = 8000
 
 [agent]
 expertMode = true

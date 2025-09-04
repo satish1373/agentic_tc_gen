@@ -9,3 +9,4 @@ langgraph==0.2.16
 gradio==4.44.0
 pandas==2.0.3
 openai
+gunicorn
