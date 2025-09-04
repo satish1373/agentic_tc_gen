@@ -88,18 +88,24 @@ class JiraAutomationAgent:
             Focus on practical, implementable changes for the existing todo app structure.
             """
             
-            response = self.openai_client.chat.completions.create(
-                model="gpt-4o",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.1
-            )
-            
-            result = response.choices[0].message.content
-            # Try to parse as JSON, fallback to structured text if needed
-            try:
-                return json.loads(result)
-            except json.JSONDecodeError:
-                return {"ai_response": result, "change_type": "manual_review"}
+            if self.openai_client:
+                response = self.openai_client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.1
+                )
+                
+                result = response.choices[0].message.content
+                # Try to parse as JSON, fallback to structured text if needed
+                try:
+                    if result:
+                        return json.loads(result)
+                    else:
+                        return {"ai_response": "Empty response", "change_type": "manual_review"}
+                except json.JSONDecodeError:
+                    return {"ai_response": result, "change_type": "manual_review"}
+            else:
+                return self._fallback_analyze_ticket(summary, description, issue_type)
                 
         except Exception as e:
             logger.error(f"❌ AI analysis failed: {e}")
